@@ -320,15 +320,15 @@ int main(int argc, char *argv[]) {
               gettimeofday(&tp, NULL);
               long int timestamp = tp.tv_sec * 1000 + tp.tv_usec / 1000;
               std::string current_block = std::to_string(block);
-              std::string current_timestamp = std::to_string(timestamp);
-              current_hypothesis = "\"block\":" + current_block + ", " + "\"timestamp\": " + current_timestamp + ", " + "\"words\":[" + current_hypothesis + "]}";
+              std::string block_identifier = std::to_string(timestamp);
+              current_hypothesis = "\"block\":" + current_block + ", " + "\"timestamp\": " + block_identifier + ", " + "\"words\":[" + current_hypothesis + "]}";
               global_message = current_hypothesis;
 
               auto transcript_time = high_resolution_clock::now();
               auto duration = duration_cast<milliseconds>( transcript_time - transcription_start ).count();
               std::string current_duration = std::to_string(duration);
 
-              current_hypothesis = "{\"blockend\": true, \"time_from_beginning\": " + current_duration + ", " + current_hypothesis;
+              current_hypothesis = "{\"block_end\": true, \"time_from_beginning\": " + current_duration + ", " + current_hypothesis;
 
               server.WriteLn(current_hypothesis + "\n", "\r");
               KALDI_VLOG(1) << "EndOfAudio, sending message: " << msg;
@@ -399,16 +399,16 @@ int main(int argc, char *argv[]) {
               gettimeofday(&tp, NULL);
               long int timestamp = tp.tv_sec * 1000 + tp.tv_usec / 1000;
               std::string current_block = std::to_string(block);
-              std::string current_timestamp = std::to_string(timestamp);
+              std::string block_identifier = std::to_string(timestamp);
 
-              message = "\"block\":" + current_block + ", "  + "\"timestamp\": " + current_timestamp + ", " + "\"words\":[" + message + "]}";
+              message = "\"block\":" + current_block + ", "  + "\"timestamp\": " + block_identifier + ", " + "\"words\":[" + message + "]}";
               global_message = message;
 
               auto transcript_time = high_resolution_clock::now();
               auto duration = duration_cast<milliseconds>( transcript_time - transcription_start ).count();
               std::string current_duration = std::to_string(duration);
 
-              message = "{\"blockend\": false, \"time_from_beginning\": " + current_duration + ", " + message;
+              message = "{\"block_end\": false, \"time_from_beginning\": " + current_duration + ", " + message;
               server.WriteLn(message + "\n", "\r");
               KALDI_VLOG(1) << "Temporary transcript: " << msg;
             }
@@ -427,7 +427,7 @@ int main(int argc, char *argv[]) {
             auto duration = duration_cast<milliseconds>( transcript_time - transcription_start ).count();
             std::string current_duration = std::to_string(duration);
 
-            global_message = "{\"blockend\": true, \"time_from_beginning\": " + current_duration + ", " + global_message;
+            global_message = "{\"block_end\": true, \"time_from_beginning\": " + current_duration + ", " + global_message;
             server.WriteLn(global_message + "\n", "\r");
             /* current_hypothesis = "{end: true, words:[" + current_hypothesis + "]}"; */
             /* server.WriteLn(current_hypothesis + "\n", "\r"); */
