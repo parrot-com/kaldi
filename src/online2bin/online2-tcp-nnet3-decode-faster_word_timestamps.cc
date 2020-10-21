@@ -33,6 +33,7 @@
 #include <sys/time.h>
 #include <iostream>
 #include <chrono>
+#include <online2/json.hpp>
 
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -58,7 +59,8 @@ class TcpServer {
   Vector<BaseFloat> GetChunk(); // get the data read by above method
 
   bool Write(const std::string &msg); // write to accepted client
-  bool WriteLn(const std::string &msg, const std::string &eol = "\n"); // write line to accepted client
+  bool WriteLn(const nlohmann::json &msg, const std::string &eol = "\n"); // write line to accepted client
+  /* bool WriteLn(const std::string &msg, const std::string &eol = ""); // write line to accepted client */
 
   void Disconnect();
 
@@ -122,6 +124,7 @@ int main(int argc, char *argv[]) {
     using namespace kaldi;
     using namespace fst;
     using namespace std::chrono;
+    using json = nlohmann::json;
 
     typedef kaldi::int32 int32;
     typedef kaldi::int64 int64;
@@ -327,14 +330,21 @@ int main(int argc, char *argv[]) {
               auto transcript_time = high_resolution_clock::now();
               auto duration = duration_cast<milliseconds>( transcript_time - transcription_start ).count();
               std::string current_duration = std::to_string(duration);
+              if (!current_hypothesis.empty()){
 
-              current_hypothesis = "{\"block_end\": true, \"time_from_beginning\": " + current_duration + ", " + current_hypothesis;
+                  current_hypothesis = "{\"block_end\": true, \"time_from_beginning\": " + current_duration + ", " + current_hypothesis;
+                  json js = current_hypothesis;
 
-              server.WriteLn(current_hypothesis + "\n", "\r");
-              KALDI_VLOG(1) << "EndOfAudio, sending message: " << msg;
+                  bool jv = json::accept(current_hypothesis);
+                  if (jv) {
+                      server.WriteLn(js);
+                      KALDI_VLOG(1) << "EndOfAudio, sending message: " << msg;
+                    }
+              }
 
             } else
-              server.Write("\n");
+                {
+                }
             server.Disconnect();
             break;
           }
@@ -392,15 +402,14 @@ int main(int argc, char *argv[]) {
 
               // remove trailing comma
               if (!message.empty()) {
-                message.erase(std::prev(message.end()));
-              }
+
+              message.erase(std::prev(message.end()));
               current_hypothesis = message;
               struct timeval tp;
               gettimeofday(&tp, NULL);
               long int timestamp = tp.tv_sec * 1000 + tp.tv_usec / 1000;
               std::string current_block = std::to_string(block);
               std::string block_identifier = std::to_string(timestamp);
-
               message = "\"block\":" + current_block + ", "  + "\"timestamp\": " + block_identifier + ", " + "\"words\":[" + message + "]}";
               global_message = message;
 
@@ -409,8 +418,14 @@ int main(int argc, char *argv[]) {
               std::string current_duration = std::to_string(duration);
 
               message = "{\"block_end\": false, \"time_from_beginning\": " + current_duration + ", " + message;
-              server.WriteLn(message + "\n", "\r");
-              KALDI_VLOG(1) << "Temporary transcript: " << msg;
+              json js = message;
+
+              bool jv = json::accept(message);
+              if (jv) {
+                  server.WriteLn(js);
+                  KALDI_VLOG(1) << "Temporary transcript: " << msg;
+                }
+              }
             }
             check_count += check_period;
           }
@@ -427,12 +442,17 @@ int main(int argc, char *argv[]) {
             auto duration = duration_cast<milliseconds>( transcript_time - transcription_start ).count();
             std::string current_duration = std::to_string(duration);
 
-            global_message = "{\"block_end\": true, \"time_from_beginning\": " + current_duration + ", " + global_message;
-            server.WriteLn(global_message + "\n", "\r");
-            /* current_hypothesis = "{end: true, words:[" + current_hypothesis + "]}"; */
-            /* server.WriteLn(current_hypothesis + "\n", "\r"); */
-            KALDI_VLOG(1) << "Endpoint, sending message: " << msg;
-            break;
+            if (!global_message.empty()) {
+                global_message = "{\"block_end\": true, \"time_from_beginning\": " + current_duration + ", " + global_message;
+                json js = global_message;
+
+                bool jv = json::accept(global_message);
+                if (jv) {
+                    server.WriteLn(js);
+                    KALDI_VLOG(1) << "Endpoint, sending message: " << msg;
+                    break;
+                    }
+                }
           }
         }
       }
@@ -583,7 +603,7 @@ bool TcpServer::Write(const std::string &msg) {
   return true;
 }
 
-bool TcpServer::WriteLn(const std::string &msg, const std::string &eol) {
+bool TcpServer::WriteLn(const nlohmann::json &msg, const std::string &eol) {
   if (Write(msg))
     return Write(eol);
   else return false;
