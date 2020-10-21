@@ -302,6 +302,9 @@ int main(int argc, char *argv[]) {
 
                 double offset;
                 std::string word = message_vector[i];
+                if (word.find("<") == 0){
+                    continue;
+                }
                 std::string str_start, str_end;
 
                 if (message_vector.size() - word_count > 0) {
@@ -393,6 +396,9 @@ int main(int argc, char *argv[]) {
                 continue;
                 }
                 std::string word = word_syms->Find(words[i]).c_str();
+                if (word.find("<") == 0){
+                    continue;
+                }
                 std::string str_start = std::to_string(times[i] * frame_shift * frame_subsampling + start_shift);
                 std::string str_end = std::to_string((times[i] + lengths[i]) * frame_shift * frame_subsampling + start_shift);
                 message = message + "{\"word\":" + "\"" + word + "\"" + "," + "\"start\":" + str_start + "," + "\"end\":" + str_end + "},";
