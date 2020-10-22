@@ -462,6 +462,7 @@ int main(int argc, char *argv[]) {
                 }
                 else {
                   KALDI_VLOG(1) << "Warning: Invalid json format encountered " << global_message;
+                  break;
                 }
               }
            }
