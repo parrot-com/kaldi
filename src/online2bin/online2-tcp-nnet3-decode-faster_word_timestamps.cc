@@ -60,7 +60,6 @@ class TcpServer {
 
   bool Write(const std::string &msg); // write to accepted client
   bool WriteLn(const nlohmann::json &msg, const std::string &eol = "\n"); // write line to accepted client
-  /* bool WriteLn(const std::string &msg, const std::string &eol = ""); // write line to accepted client */
 
   void Disconnect();
 
@@ -343,11 +342,11 @@ int main(int argc, char *argv[]) {
                       server.WriteLn(js);
                       KALDI_VLOG(1) << "EndOfAudio, sending message: " << msg;
                     }
-              }
-
-            } else
-                {
+                  else {
+                      KALDI_VLOG(1) << "Warning: Invalid json format encountered " << current_hypothesis;
+                    }
                 }
+            }
             server.Disconnect();
             break;
           }
@@ -409,27 +408,30 @@ int main(int argc, char *argv[]) {
               // remove trailing comma
               if (!message.empty()) {
 
-              message.erase(std::prev(message.end()));
-              current_hypothesis = message;
-              struct timeval tp;
-              gettimeofday(&tp, NULL);
-              long int timestamp = tp.tv_sec * 1000 + tp.tv_usec / 1000;
-              std::string current_block = std::to_string(block);
-              std::string block_identifier = std::to_string(timestamp);
-              message = "\"block\":" + current_block + ", "  + "\"timestamp\": " + block_identifier + ", " + "\"words\":[" + message + "]}";
-              global_message = message;
+                message.erase(std::prev(message.end()));
+                current_hypothesis = message;
+                struct timeval tp;
+                gettimeofday(&tp, NULL);
+                long int timestamp = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+                std::string current_block = std::to_string(block);
+                std::string block_identifier = std::to_string(timestamp);
+                message = "\"block\":" + current_block + ", "  + "\"timestamp\": " + block_identifier + ", " + "\"words\":[" + message + "]}";
+                global_message = message;
 
-              auto transcript_time = high_resolution_clock::now();
-              auto duration = duration_cast<milliseconds>( transcript_time - transcription_start ).count();
-              std::string current_duration = std::to_string(duration);
+                auto transcript_time = high_resolution_clock::now();
+                auto duration = duration_cast<milliseconds>( transcript_time - transcription_start ).count();
+                std::string current_duration = std::to_string(duration);
 
-              message = "{\"block_end\": false, \"time_from_beginning\": " + current_duration + ", " + message;
-              json js = message;
+                message = "{\"block_end\": false, \"time_from_beginning\": " + current_duration + ", " + message;
+                json js = message;
 
-              bool jv = json::accept(message);
-              if (jv) {
-                  server.WriteLn(js);
-                  KALDI_VLOG(1) << "Temporary transcript: " << msg;
+                bool jv = json::accept(message);
+                if (jv) {
+                    server.WriteLn(js);
+                    KALDI_VLOG(1) << "Temporary transcript: " << msg;
+                }
+                else {
+                   KALDI_VLOG(1) << "Warning: Invalid json format encountered " << message;
                 }
               }
             }
@@ -457,10 +459,13 @@ int main(int argc, char *argv[]) {
                     server.WriteLn(js);
                     KALDI_VLOG(1) << "Endpoint, sending message: " << msg;
                     break;
-                    }
                 }
-          }
-        }
+                else {
+                  KALDI_VLOG(1) << "Warning: Invalid json format encountered " << global_message;
+                }
+              }
+           }
+         }
       }
     }
   } catch (const std::exception &e) {
