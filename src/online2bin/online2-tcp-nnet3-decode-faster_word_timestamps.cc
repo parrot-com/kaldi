@@ -43,6 +43,43 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <string>
+#include <random>
+#include <sstream>
+
+namespace uuid {
+    static std::random_device              rd;
+    static std::mt19937                    gen(rd());
+    static std::uniform_int_distribution<> dis(0, 15);
+    static std::uniform_int_distribution<> dis2(8, 11);
+
+    std::string generate_uuid_v4() {
+        std::stringstream ss;
+        int i;
+        ss << std::hex;
+        for (i = 0; i < 8; i++) {
+            ss << dis(gen);
+        }
+        ss << "-";
+        for (i = 0; i < 4; i++) {
+            ss << dis(gen);
+        }
+        ss << "-4";
+        for (i = 0; i < 3; i++) {
+            ss << dis(gen);
+        }
+        ss << "-";
+        ss << dis2(gen);
+        for (i = 0; i < 3; i++) {
+            ss << dis(gen);
+        }
+        ss << "-";
+        for (i = 0; i < 12; i++) {
+            ss << dis(gen);
+        };
+        return ss.str();
+    }
+}
+
 
 namespace kaldi {
 
@@ -121,6 +158,7 @@ std::string LatticeToString(const CompactLattice &clat, const fst::SymbolTable &
 int main(int argc, char *argv[]) {
   try {
     using namespace kaldi;
+    using namespace uuid;
     using namespace fst;
     using namespace std::chrono;
     using json = nlohmann::json;
@@ -250,6 +288,7 @@ int main(int argc, char *argv[]) {
       double last_timestamp = 0.0;
       std::string current_hypothesis = "";
       std::string global_message = "";
+      std::string block_uuid = generate_uuid_v4();
       auto transcription_start = high_resolution_clock::now();
 
       OnlineNnet2FeaturePipeline feature_pipeline(feature_info);
@@ -326,7 +365,7 @@ int main(int argc, char *argv[]) {
               long int timestamp = tp.tv_sec * 1000 + tp.tv_usec / 1000;
               std::string current_block = std::to_string(block);
               std::string block_identifier = std::to_string(timestamp);
-              current_hypothesis = "\"block\":" + current_block + ", " + "\"timestamp\": " + block_identifier + ", " + "\"words\":[" + current_hypothesis + "]}";
+              current_hypothesis = "\"block_uuid\":\"" + block_uuid + "\"" + ", " +  "\"block\":" + current_block + ", " + "\"timestamp\": " + block_identifier + ", " + "\"words\":[" + current_hypothesis + "]}";
               global_message = current_hypothesis;
 
               auto transcript_time = high_resolution_clock::now();
@@ -339,7 +378,7 @@ int main(int argc, char *argv[]) {
                   bool jv = json::accept(current_hypothesis);
                   if (jv) {
                       server.Write(current_hypothesis);
-                      KALDI_VLOG(1) << "EndOfAudio, sending message: " << msg;
+                      KALDI_VLOG(1) << "EndOfAudio, sending message: " << current_hypothesis;
                     }
                   else {
                       KALDI_VLOG(1) << "Warning: Invalid json format encountered " << current_hypothesis;
@@ -414,7 +453,7 @@ int main(int argc, char *argv[]) {
                 long int timestamp = tp.tv_sec * 1000 + tp.tv_usec / 1000;
                 std::string current_block = std::to_string(block);
                 std::string block_identifier = std::to_string(timestamp);
-                message = "\"block\":" + current_block + ", "  + "\"timestamp\": " + block_identifier + ", " + "\"words\":[" + message + "]}";
+                message = "\"block_uuid\":\"" + block_uuid + "\"" + ", " + "\"block\":" + current_block + ", "  + "\"timestamp\": " + block_identifier + ", " + "\"words\":[" + message + "]}";
                 global_message = message;
 
                 auto transcript_time = high_resolution_clock::now();
@@ -426,7 +465,7 @@ int main(int argc, char *argv[]) {
                 bool jv = json::accept(message);
                 if (jv) {
                     server.Write(message);
-                    KALDI_VLOG(1) << "Temporary transcript: " << msg;
+                    KALDI_VLOG(1) << "Temporary transcript: " << message;
                 }
                 else {
                    KALDI_VLOG(1) << "Warning: Invalid json format encountered " << message;
@@ -438,6 +477,7 @@ int main(int argc, char *argv[]) {
 
           if (decoder.EndpointDetected(endpoint_opts)) {
             block += 1;
+            block_uuid = generate_uuid_v4();
             decoder.FinalizeDecoding();
             frame_offset += decoder.NumFramesDecoded();
             CompactLattice lat;
@@ -454,7 +494,7 @@ int main(int argc, char *argv[]) {
                 bool jv = json::accept(global_message);
                 if (jv) {
                     server.Write(global_message);
-                    KALDI_VLOG(1) << "Endpoint, sending message: " << msg;
+                    KALDI_VLOG(1) << "Endpoint, sending message: " << global_message;
                     break;
                 }
                 else {
