@@ -335,11 +335,10 @@ int main(int argc, char *argv[]) {
               if (!current_hypothesis.empty()){
 
                   current_hypothesis = "{\"block_end\": true, \"time_from_beginning\": " + current_duration + ", " + current_hypothesis;
-                  json js = current_hypothesis;
 
                   bool jv = json::accept(current_hypothesis);
                   if (jv) {
-                      server.WriteLn(js);
+                      server.Write(current_hypothesis);
                       KALDI_VLOG(1) << "EndOfAudio, sending message: " << msg;
                     }
                   else {
@@ -423,11 +422,10 @@ int main(int argc, char *argv[]) {
                 std::string current_duration = std::to_string(duration);
 
                 message = "{\"block_end\": false, \"time_from_beginning\": " + current_duration + ", " + message;
-                json js = message;
 
                 bool jv = json::accept(message);
                 if (jv) {
-                    server.WriteLn(js);
+                    server.Write(message);
                     KALDI_VLOG(1) << "Temporary transcript: " << msg;
                 }
                 else {
@@ -452,11 +450,10 @@ int main(int argc, char *argv[]) {
 
             if (!global_message.empty()) {
                 global_message = "{\"block_end\": true, \"time_from_beginning\": " + current_duration + ", " + global_message;
-                json js = global_message;
 
                 bool jv = json::accept(global_message);
                 if (jv) {
-                    server.WriteLn(js);
+                    server.Write(global_message);
                     KALDI_VLOG(1) << "Endpoint, sending message: " << msg;
                     break;
                 }
@@ -620,7 +617,7 @@ bool TcpServer::Write(const std::string &msg) {
 
 bool TcpServer::WriteLn(const nlohmann::json &msg, const std::string &eol) {
   if (Write(msg))
-    return true;
+    return Write(eol);
   else return false;
 }
 
