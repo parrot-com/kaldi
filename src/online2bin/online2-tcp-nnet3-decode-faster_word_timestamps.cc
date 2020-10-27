@@ -620,7 +620,7 @@ bool TcpServer::Write(const std::string &msg) {
 
 bool TcpServer::WriteLn(const nlohmann::json &msg, const std::string &eol) {
   if (Write(msg))
-    return Write(eol);
+    return true;
   else return false;
 }
 
