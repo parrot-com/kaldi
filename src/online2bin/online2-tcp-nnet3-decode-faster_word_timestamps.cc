@@ -288,6 +288,8 @@ int main(int argc, char *argv[]) {
       double last_timestamp = 0.0;
       std::string current_hypothesis = "";
       std::string global_message = "";
+      std::string global_block_start = "";
+      std::string global_block_end = "";
       std::string block_uuid = generate_uuid_v4();
       auto transcription_start = high_resolution_clock::now();
 
@@ -355,35 +357,38 @@ int main(int argc, char *argv[]) {
                 last_timestamp = last_timestamp + offset;
                 str_end = std::to_string(last_timestamp);
                 current_hypothesis = current_hypothesis + "{\"word\":" + "\"" + word + "\"," + "\"start\":" + str_start + "," + "\"end\":" + str_end + "},";
-              }
-              if (!current_hypothesis.empty()) {
-                current_hypothesis.erase(std::prev(current_hypothesis.end()));
+                word_count += 1;
+                global_block_end = str_end;
               }
 
+              if (word_count > 0) {
+              current_hypothesis.erase(std::prev(current_hypothesis.end()));
               struct timeval tp;
               gettimeofday(&tp, NULL);
               long int timestamp = tp.tv_sec * 1000 + tp.tv_usec / 1000;
               std::string current_block = std::to_string(block);
               std::string block_identifier = std::to_string(timestamp);
-              current_hypothesis = "\"block_uuid\":\"" + block_uuid + "\"" + ", " +  "\"block\":" + current_block + ", " + "\"timestamp\": " + block_identifier + ", " + "\"words\":[" + current_hypothesis + "]}";
+              current_hypothesis = "\"block_uuid\":\"" + block_uuid + "\"" + ", " +  "\"block\":" + current_block + ", " + "\"timestamp\": " + block_identifier + ", " + ", \"block_word_start\": " + global_block_start + ", \"block_word_end\": " + global_block_end + ", " + "\"words\":[" + current_hypothesis + "]}";
               global_message = current_hypothesis;
 
               auto transcript_time = high_resolution_clock::now();
               auto duration = duration_cast<milliseconds>( transcript_time - transcription_start ).count();
               std::string current_duration = std::to_string(duration);
-              if (!current_hypothesis.empty()){
 
-                  current_hypothesis = "{\"block_end\": true, \"time_from_beginning\": " + current_duration + ", " + current_hypothesis;
+              current_hypothesis = "{\"block_end\": true, \"time_from_beginning\": " + current_duration + ", " + current_hypothesis;
 
-                  bool jv = json::accept(current_hypothesis);
-                  if (jv) {
-                      server.Write(current_hypothesis);
-                      KALDI_VLOG(1) << "EndOfAudio, sending message: " << current_hypothesis;
-                    }
-                  else {
-                      KALDI_VLOG(1) << "Warning: Invalid json format encountered " << current_hypothesis;
-                    }
+              bool jv = json::accept(current_hypothesis);
+              if (jv) {
+                server.Write(current_hypothesis);
+                KALDI_VLOG(1) << "EndOfAudio, sending message: " << current_hypothesis;
                 }
+              else {
+                KALDI_VLOG(1) << "Warning: Invalid json format encountered " << current_hypothesis;
+                }
+            }
+            else {
+                current_hypothesis = "";
+            }
             }
             server.Disconnect();
             break;
@@ -426,6 +431,9 @@ int main(int argc, char *argv[]) {
               istringstream iss(msg);
               vector<string> message_vector{istream_iterator<string>{iss}, istream_iterator<string>{}};
               std::string message = "";
+              std::string block_word_start = "";
+              std::string block_word_end = "";
+              bool assigned = false;
               word_count = 0;
 
               for (int i = 0; i < words.size(); i++) {
@@ -438,22 +446,29 @@ int main(int argc, char *argv[]) {
                 }
                 std::string str_start = std::to_string(times[i] * frame_shift * frame_subsampling + start_shift);
                 std::string str_end = std::to_string((times[i] + lengths[i]) * frame_shift * frame_subsampling + start_shift);
+                if (!assigned) {
+                    block_word_start = str_start;
+                    assigned = true;
+                }
                 message = message + "{\"word\":" + "\"" + word + "\"" + "," + "\"start\":" + str_start + "," + "\"end\":" + str_end + "},";
-                word_count += 1; // we want to remember the number of words in each lattice hypothesis
                 last_timestamp = (times[i] + lengths[i]) * frame_shift * frame_subsampling;
+                block_word_end = str_end;
+                word_count += 1; // we want to remember the number of words in each lattice hypothesis
               }
 
               // remove trailing comma
-              if (!message.empty()) {
+              if (!message.empty() && word_count > 0) {
 
                 message.erase(std::prev(message.end()));
                 current_hypothesis = message;
+                global_block_start = block_word_start;
+                global_block_end = block_word_end;
                 struct timeval tp;
                 gettimeofday(&tp, NULL);
                 long int timestamp = tp.tv_sec * 1000 + tp.tv_usec / 1000;
                 std::string current_block = std::to_string(block);
                 std::string block_identifier = std::to_string(timestamp);
-                message = "\"block_uuid\":\"" + block_uuid + "\"" + ", " + "\"block\":" + current_block + ", "  + "\"timestamp\": " + block_identifier + ", " + "\"words\":[" + message + "]}";
+                message = "\"block_uuid\":\"" + block_uuid + "\"" + ", " + "\"block\":" + current_block + ", "  + "\"timestamp\": " + block_identifier + ", \"block_word_start\": " + block_word_start + ", \"block_word_end\": " + block_word_end + ", " + "\"words\":[" + message + "]}";
                 global_message = message;
 
                 auto transcript_time = high_resolution_clock::now();
@@ -488,7 +503,7 @@ int main(int argc, char *argv[]) {
             auto duration = duration_cast<milliseconds>( transcript_time - transcription_start ).count();
             std::string current_duration = std::to_string(duration);
 
-            if (!global_message.empty()) {
+            if (!global_message.empty() && word_count > 0) {
                 global_message = "{\"block_end\": true, \"time_from_beginning\": " + current_duration + ", " + global_message;
 
                 bool jv = json::accept(global_message);
@@ -503,6 +518,7 @@ int main(int argc, char *argv[]) {
                 }
               }
             else {
+                global_message = "";
                 break;
              }
            }
